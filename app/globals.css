@@ -46,3 +46,54 @@ input[type="range"] {
 select {
   cursor: pointer;
 }
+
+/* ============================================================
+   Leaflet popup personalizado — clase .hogarjusto-popup
+   ============================================================ */
+.hogarjusto-popup .leaflet-popup-content-wrapper {
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  border: 1px solid #e8e0d4;
+  padding: 0;
+}
+
+.hogarjusto-popup .leaflet-popup-content {
+  margin: 12px 14px;
+  line-height: 1.4;
+}
+
+.hogarjusto-popup .leaflet-popup-tip {
+  box-shadow: none;
+  border: 1px solid #e8e0d4;
+}
+
+.hogarjusto-popup .leaflet-popup-close-button {
+  color: #8a7e6d !important;
+  font-size: 20px !important;
+  padding: 6px 8px !important;
+}
+
+.hogarjusto-popup .leaflet-popup-close-button:hover {
+  color: #3d3528 !important;
+}
+
+/* Controles de zoom de Leaflet — ajustar al estilo del proyecto */
+.leaflet-control-zoom a {
+  color: #3d3528 !important;
+  border-color: #e8e0d4 !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background-color: #f5f0e8 !important;
+}
+
+/* Atribución Leaflet — más discreta */
+.leaflet-control-attribution {
+  font-size: 9px !important;
+  background: rgba(250, 248, 244, 0.85) !important;
+  color: #8a7e6d !important;
+}
+
+.leaflet-control-attribution a {
+  color: #7a9e6d !important;
+}

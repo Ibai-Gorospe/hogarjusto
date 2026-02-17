@@ -1,33 +1,81 @@
 "use client";
 
+/**
+ * MapaPrecios — Pestaña principal "Mapa de Precios"
+ *
+ * Dos vistas:
+ *   1. "Precios actuales" — mapa con precios €/m², capa de calor por precio,
+ *      filtro por rango de precio
+ *   2. "Evolución de precios" — mapa con variación %, capa de calor por subida,
+ *      selector de período (1, 3, 5, 10 años)
+ *
+ * El mapa Leaflet se carga dinámicamente (sin SSR) desde MapaLeafletClient.
+ */
+
 import { useState, useMemo } from "react";
-import { BARRIOS, AÑOS_HISTORICO, formatEur, formatPct, getColor, getLabel } from "@/app/lib/data";
+import dynamic from "next/dynamic";
+import { BARRIOS, formatEur } from "@/app/lib/data";
+
+// Importación dinámica del mapa (Leaflet no funciona en servidor)
+const MapaLeaflet = dynamic(() => import("./MapaLeafletClient"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[420px] md:h-[520px] bg-[#f0ebe3] rounded-2xl border border-[#e8e0d4] animate-pulse flex items-center justify-center">
+      <span className="text-[#8a7e6d] text-sm">Cargando mapa...</span>
+    </div>
+  ),
+});
+
+// ============================================================
+// Tipos y constantes
+// ============================================================
+
+type Vista = "precios" | "evolucion";
+type Periodo = "1a" | "3a" | "5a" | "10a";
+
+const RANGOS_PRECIO = [
+  { key: "todos", label: "Todos", min: 0, max: Infinity },
+  { key: "economico", label: "Económico", desc: "<2.200€", min: 0, max: 2200 },
+  { key: "asequible", label: "Asequible", desc: "2.200–3.000€", min: 2200, max: 3000 },
+  { key: "medio", label: "Medio", desc: "3.000–3.500€", min: 3000, max: 3500 },
+  { key: "medio-alto", label: "Medio-alto", desc: "3.500–4.500€", min: 3500, max: 4500 },
+  { key: "premium", label: "Premium", desc: ">4.500€", min: 4500, max: Infinity },
+] as const;
+
+const PERIODOS: { key: Periodo; label: string }[] = [
+  { key: "1a", label: "1 año" },
+  { key: "3a", label: "3 años" },
+  { key: "5a", label: "5 años" },
+  { key: "10a", label: "10 años" },
+];
+
+// ============================================================
+// Componente
+// ============================================================
 
 export default function MapaPrecios() {
-  const [selectedBarrio, setSelectedBarrio] = useState<string | null>(null);
-  const [filterTipo, setFilterTipo] = useState<string>("todos");
-  const [sortBy, setSortBy] = useState<string>("precio");
+  const [vista, setVista] = useState<Vista>("precios");
+  const [filtroRango, setFiltroRango] = useState("todos");
+  const [periodo, setPeriodo] = useState<Periodo>("1a");
 
-  // Filtrar y ordenar barrios
-  const filteredBarrios = useMemo(() => {
-    let b = [...BARRIOS];
-    if (filterTipo !== "todos") b = b.filter(x => x.tipo === filterTipo);
-    if (sortBy === "precio") b.sort((a, c) => a.precioM2 - c.precioM2);
-    else if (sortBy === "precio-desc") b.sort((a, c) => c.precioM2 - a.precioM2);
-    else if (sortBy === "variacion") b.sort((a, c) => c.var - a.var);
-    return b;
-  }, [filterTipo, sortBy]);
-
-  // Stats generales
+  // — Estadísticas generales —
   const precioMin = Math.min(...BARRIOS.map(b => b.precioM2));
   const precioMax = Math.max(...BARRIOS.map(b => b.precioM2));
   const precioMedio = Math.round(BARRIOS.reduce((s, b) => s + b.precioM2, 0) / BARRIOS.length);
-  const zonaCara = BARRIOS.reduce((a, b) => a.precioM2 > b.precioM2 ? a : b);
-  const zonaBarata = BARRIOS.reduce((a, b) => a.precioM2 < b.precioM2 ? a : b);
+  const zonaCara = BARRIOS.reduce((a, b) => (a.precioM2 > b.precioM2 ? a : b));
+  const zonaBarata = BARRIOS.reduce((a, b) => (a.precioM2 < b.precioM2 ? a : b));
+
+  // — Filtro por rango de precio (solo aplica en vista "precios") —
+  const filteredZonas = useMemo(() => {
+    if (vista === "evolucion" || filtroRango === "todos") return [...BARRIOS];
+    const rango = RANGOS_PRECIO.find(r => r.key === filtroRango);
+    if (!rango) return [...BARRIOS];
+    return BARRIOS.filter(b => b.precioM2 >= rango.min && b.precioM2 < rango.max);
+  }, [filtroRango, vista]);
 
   return (
     <div>
-      {/* Stats resumen */}
+      {/* ========== STATS RESUMEN ========== */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
           { label: "Media ciudad", value: formatEur(precioMedio) + "/m²", sub: `${BARRIOS.length} zonas` },
@@ -42,119 +90,132 @@ export default function MapaPrecios() {
         ))}
       </div>
 
-      {/* Filtros */}
-      <div className="flex gap-2 mb-4 flex-wrap">
-        <select
-          value={filterTipo}
-          onChange={e => setFilterTipo(e.target.value)}
-          className="bg-white border border-[#ddd5c8] rounded-lg px-3 py-2 text-sm text-[#3d3528] outline-none"
+      {/* ========== TABS DE VISTA ========== */}
+      <div className="flex gap-1 mb-4 bg-[#f0ebe3] rounded-xl p-1">
+        <button
+          onClick={() => setVista("precios")}
+          className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all ${
+            vista === "precios"
+              ? "bg-white text-[#3d3528] shadow-sm"
+              : "text-[#8a7e6d] hover:text-[#3d3528]"
+          }`}
         >
-          <option value="todos">Todos los barrios</option>
-          <option value="premium">Premium</option>
-          <option value="medio-alto">Medio-Alto</option>
-          <option value="medio">Medio</option>
-          <option value="asequible">Asequible</option>
-          <option value="económico">Económico</option>
-        </select>
-        <select
-          value={sortBy}
-          onChange={e => setSortBy(e.target.value)}
-          className="bg-white border border-[#ddd5c8] rounded-lg px-3 py-2 text-sm text-[#3d3528] outline-none"
+          Precios actuales
+        </button>
+        <button
+          onClick={() => setVista("evolucion")}
+          className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all ${
+            vista === "evolucion"
+              ? "bg-white text-[#3d3528] shadow-sm"
+              : "text-[#8a7e6d] hover:text-[#3d3528]"
+          }`}
         >
-          <option value="precio">Precio: menor a mayor</option>
-          <option value="precio-desc">Precio: mayor a menor</option>
-          <option value="variacion">Mayor subida</option>
-        </select>
+          Evolución de precios
+        </button>
       </div>
 
-      {/* Lista de barrios */}
-      <div className="space-y-3">
-        {filteredBarrios.map(b => (
-          <div
-            key={b.name}
-            onClick={() => setSelectedBarrio(selectedBarrio === b.name ? null : b.name)}
-            className="bg-white rounded-2xl p-4 border border-[#e8e0d4] shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-          >
-            {/* Cabecera del barrio */}
-            <div className="flex justify-between items-start mb-2">
-              <div>
-                <div className="font-bold text-[#3d3528]">{b.name}</div>
-              </div>
-              <div className="text-right">
-                <div className="text-lg font-bold" style={{ color: getColor(b.precioM2) }}>
-                  {formatEur(b.precioM2)}
-                </div>
-                <div className="text-xs text-[#8a7e6d]">€/m²</div>
-              </div>
-            </div>
+      {/* ========== FILTROS ========== */}
+      {vista === "precios" ? (
+        <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1 scrollbar-hide">
+          {RANGOS_PRECIO.map(r => (
+            <button
+              key={r.key}
+              onClick={() => setFiltroRango(r.key)}
+              className={`whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                filtroRango === r.key
+                  ? "bg-[#7a9e6d] text-white shadow-sm"
+                  : "bg-white text-[#8a7e6d] border border-[#e8e0d4] hover:border-[#7a9e6d] hover:text-[#7a9e6d]"
+              }`}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="flex gap-1.5 mb-4">
+          {PERIODOS.map(p => (
+            <button
+              key={p.key}
+              onClick={() => setPeriodo(p.key)}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                periodo === p.key
+                  ? "bg-[#7a9e6d] text-white shadow-sm"
+                  : "bg-white text-[#8a7e6d] border border-[#e8e0d4] hover:border-[#7a9e6d] hover:text-[#7a9e6d]"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      )}
 
-            {/* Barra de precio + badges */}
-            <div className="flex items-center gap-2 mb-2">
-              <div className="flex-1 h-2 bg-[#f0ebe3] rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${((b.precioM2 - precioMin) / (precioMax - precioMin)) * 100}%`,
-                    background: getColor(b.precioM2)
-                  }}
-                />
-              </div>
-              <span
-                className="text-xs font-semibold px-2.5 py-0.5 rounded-full"
-                style={{ background: getColor(b.precioM2) + "18", color: getColor(b.precioM2) }}
-              >
-                {formatPct(b.var)}
-              </span>
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#f5f0e8] text-[#8a7e6d]">
-                {getLabel(b.tipo)}
-              </span>
-            </div>
+      {/* ========== MAPA ========== */}
+      <MapaLeaflet
+        zonas={filteredZonas}
+        vista={vista}
+        periodo={periodo}
+      />
 
-            {/* Detalle expandido: serie histórica */}
-            {selectedBarrio === b.name && (
-              <div className="mt-3 pt-3 border-t border-[#e8e0d4]">
-                <div className="text-[10px] text-[#8a7e6d] uppercase tracking-wider font-semibold mb-2">Evolución €/m² (2015–2026)</div>
-                <div className="flex items-end gap-[3px] h-16">
-                  {b.historico.map((p, i) => {
-                    if (p === 0) return <div key={i} className="flex-1" />;
-                    const maxH = Math.max(...b.historico.filter(v => v > 0));
-                    const minH = Math.min(...b.historico.filter(v => v > 0));
-                    const pct = maxH === minH ? 100 : ((p - minH) / (maxH - minH)) * 80 + 20;
-                    const isLast = i === b.historico.length - 1;
-                    return (
-                      <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
-                        <div
-                          className="w-full rounded-sm transition-all"
-                          style={{
-                            height: `${pct}%`,
-                            background: isLast ? getColor(b.precioM2) : "#d4cfc6",
-                          }}
-                          title={`${AÑOS_HISTORICO[i]}: ${formatEur(p)}/m²`}
-                        />
-                        {(i === 0 || i === 6 || isLast) && (
-                          <div className="text-[8px] text-[#8a7e6d]">{String(AÑOS_HISTORICO[i]).slice(2)}</div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="mt-2 text-center text-xs text-[#8a7e6d]">
-                  Piso medio de 80m²: <span className="font-bold text-[#3d3528]">{formatEur(b.precioM2 * 80)}</span>
-                </div>
-              </div>
-            )}
+      {/* ========== LEYENDA ========== */}
+      {vista === "precios" ? (
+        <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
+          <span className="text-[10px] text-[#8a7e6d]">Capa de calor:</span>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-sm" style={{ background: "#3b82f6" }} />
+            <span className="text-[10px] text-[#8a7e6d]">Barato</span>
           </div>
-        ))}
-      </div>
+          <div
+            className="w-10 h-2.5 rounded-full"
+            style={{ background: "linear-gradient(90deg, #3b82f6, #22c55e, #eab308, #f97316, #ef4444)" }}
+          />
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-sm" style={{ background: "#ef4444" }} />
+            <span className="text-[10px] text-[#8a7e6d]">Caro</span>
+          </div>
+          {filtroRango !== "todos" && (
+            <span className="text-[10px] text-[#7a9e6d] ml-2">
+              ({filteredZonas.length} de {BARRIOS.length} zonas)
+            </span>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
+          <span className="text-[10px] text-[#8a7e6d]">Capa de calor:</span>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-sm" style={{ background: "#22c55e" }} />
+            <span className="text-[10px] text-[#8a7e6d]">Poca subida</span>
+          </div>
+          <div
+            className="w-10 h-2.5 rounded-full"
+            style={{ background: "linear-gradient(90deg, #22c55e, #eab308, #ef4444)" }}
+          />
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-sm" style={{ background: "#ef4444" }} />
+            <span className="text-[10px] text-[#8a7e6d]">Mucha subida</span>
+          </div>
+        </div>
+      )}
 
-      {/* Tendencias */}
+      {/* ========== TENDENCIAS ========== */}
       <div className="bg-white rounded-2xl p-5 border border-[#e8e0d4] mt-4">
-        <div className="text-sm font-bold text-[#7a9e6d] mb-2">💡 Tendencias clave 2026</div>
+        <div className="text-sm font-bold text-[#7a9e6d] mb-2">Tendencias clave 2026</div>
         <ul className="text-sm text-[#5a5040] space-y-2 list-disc pl-4">
-          <li>Subidas de <strong className="text-[#c0534f]">dos dígitos</strong> en muchas zonas: El Pilar, Salburua, Txagorritxu y Zaramaga lideran</li>
-          <li><strong className="text-[#3d3528]">Salburua y Zabalgana</strong> ya superan los 3.000€/m², consolidados como barrios premium</li>
-          <li>Zonas más caras (Lovaina, Armentia, Ciudad Jardín) superan los <strong className="text-[#3d3528]">4.000€/m²</strong> en compraventas reales</li>
-          <li>El stock sigue bajo y la demanda crece por empleo, salarios y tipos de interés atractivos</li>
+          <li>
+            Subidas de <strong className="text-[#c0534f]">dos dígitos</strong> en prácticamente
+            todas las zonas: Asteguieta (+25%), Aranbizkarra (+24%) y Abetxuko (+22%) lideran
+          </li>
+          <li>
+            <strong className="text-[#3d3528]">56 zonas</strong> analizadas con serie histórica
+            2015–2026 de fuentes reales (Perales Digital, General Inmobiliaria)
+          </li>
+          <li>
+            Zonas premium (Arantzabal-Castilla Sur, Sector Sur, Ciudad Jardín) superan los{" "}
+            <strong className="text-[#3d3528]">4.500 €/m²</strong>
+          </li>
+          <li>
+            El stock sigue bajo y la demanda crece por empleo, salarios y tipos de interés
+            atractivos
+          </li>
         </ul>
       </div>
     </div>
