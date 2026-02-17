@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { TABS } from "@/app/lib/data";
 import { useAuth } from "@/app/lib/AuthContext";
+import AuthForm from "@/app/components/AuthForm";
 import MapaPrecios from "@/app/components/MapaPrecios";
 import PrecioJusto from "@/app/components/PrecioJusto";
 import CostesCompra from "@/app/components/CostesCompra";
@@ -13,7 +14,26 @@ import Guia from "@/app/components/Guia";
 
 export default function Dashboard() {
   const [tab, setTab] = useState(0);
-  const { user, signOut } = useAuth();
+  const [showLogin, setShowLogin] = useState(false);
+  const { user, loading, signOut } = useAuth();
+
+  // Modal de login (se muestra encima del dashboard)
+  if (showLogin && !user) {
+    return (
+      <div className="relative">
+        {/* Botón volver */}
+        <div className="fixed top-4 left-4 z-50">
+          <button
+            onClick={() => setShowLogin(false)}
+            className="text-sm text-[#8a7e6d] hover:text-[#3d3528] bg-white/80 backdrop-blur rounded-full px-4 py-2 border border-[#e8e0d4]"
+          >
+            ← Volver
+          </button>
+        </div>
+        <AuthForm onSuccess={() => setShowLogin(false)} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#faf7f2] via-[#f5f0e8] to-[#faf7f2] text-[#3d3528] font-sans px-4 py-5">
@@ -27,18 +47,28 @@ export default function Dashboard() {
         <p className="text-[#8a7e6d] text-sm mt-1.5">
           Guía de compra de vivienda en Vitoria-Gasteiz
         </p>
-        {/* Info usuario y logout */}
-        {user && (
-          <div className="mt-2 flex items-center justify-center gap-2">
-            <span className="text-xs text-[#8a7e6d]">{user.email}</span>
+
+        {/* Auth: mostrar email + logout o botón de login */}
+        <div className="mt-2">
+          {loading ? null : user ? (
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-xs text-[#8a7e6d]">{user.email}</span>
+              <button
+                onClick={signOut}
+                className="text-xs text-[#c0735e] hover:underline"
+              >
+                Cerrar sesión
+              </button>
+            </div>
+          ) : (
             <button
-              onClick={signOut}
-              className="text-xs text-[#c0735e] hover:underline"
+              onClick={() => setShowLogin(true)}
+              className="text-xs text-[#7a9e6d] hover:underline"
             >
-              Cerrar sesión
+              Iniciar sesión · Guardar tus datos en la nube
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Navegación por pestañas */}

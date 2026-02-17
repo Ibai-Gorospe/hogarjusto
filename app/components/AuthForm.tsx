@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 
-export default function AuthForm() {
+interface AuthFormProps {
+  onSuccess?: () => void; // Callback para volver al dashboard tras login
+}
+
+export default function AuthForm({ onSuccess }: AuthFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -33,14 +37,17 @@ export default function AuthForm() {
       if (error) {
         setError(error.message);
       } else {
-        setMessage("¡Cuenta creada! Revisa tu email para confirmarla.");
+        // Registro exitoso — volver al dashboard (AuthContext detecta la sesión)
+        onSuccess?.();
       }
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         setError("Email o contraseña incorrectos");
+      } else {
+        // Login exitoso — volver al dashboard
+        onSuccess?.();
       }
-      // Si el login es correcto, el AuthContext detecta el cambio automáticamente
     }
 
     setLoading(false);
