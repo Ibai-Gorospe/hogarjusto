@@ -34,7 +34,7 @@ export const BARRIOS: Barrio[] = [
   { name: "Coronación", precioM2: 2200, var: 8.0, tipo: "asequible", lat: 42.857, lng: -2.670, desc: "Muchas transacciones, barrio activo", servicios: 7, transporte: 7, zonaVerde: 5, ambiente: "Popular dinámico" },
   { name: "Santa Lucía", precioM2: 2300, var: 8.0, tipo: "asequible", lat: 42.845, lng: -2.660, desc: "Zona en revalorización", servicios: 6, transporte: 7, zonaVerde: 5, ambiente: "En transformación" },
   { name: "Sansomendi", precioM2: 1950, var: 8.0, tipo: "económico", lat: 42.866, lng: -2.672, desc: "Demanda creciente, zonas verdes amplias", servicios: 6, transporte: 6, zonaVerde: 7, ambiente: "Popular accesible" },
-  { name: "El Pilar", precioM2: 2750, var: 12.0, tipo: "medio", lat: 42.854, lng: -2.662, desc: "Edificios años 60-70, cerca del centro, fuerte subida", servicios: 7, transporte: 8, zonaVerde: 5, ambiente: "Práctico céntrico" },
+  { name: "El Pilar", precioM2: 2750, var: 12.0, tipo: "medio", lat: 42.852, lng: -2.672, desc: "Edificios años 60-70, cerca del centro, fuerte subida", servicios: 7, transporte: 8, zonaVerde: 5, ambiente: "Práctico céntrico" },
   { name: "Zaramaga", precioM2: 2300, var: 10.0, tipo: "asequible", lat: 42.860, lng: -2.665, desc: "Origen obrero, junto CC Boulevard, en auge", servicios: 7, transporte: 7, zonaVerde: 4, ambiente: "Popular comercial" },
   { name: "Aranbizkarra", precioM2: 2250, var: 8.0, tipo: "asequible", lat: 42.863, lng: -2.660, desc: "De los más económicos, subida notable", servicios: 5, transporte: 6, zonaVerde: 5, ambiente: "Económico funcional" },
   { name: "Abetxuko", precioM2: 1900, var: 10.0, tipo: "económico", lat: 42.870, lng: -2.680, desc: "El más asequible urbano, buena opción primeros compradores", servicios: 5, transporte: 5, zonaVerde: 6, ambiente: "Económico periférico" },
@@ -168,7 +168,7 @@ export async function geocodificarDireccion(
 
   const url = `https://nominatim.openstreetmap.org/search?` +
     `format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=es` +
-    `&viewbox=-2.75,-2.60,42.81,42.90&bounded=1`;
+    `&viewbox=-2.75,42.90,-2.60,42.81&bounded=1`;
 
   try {
     const res = await fetch(url, {
