@@ -462,37 +462,47 @@ function PisoCard({
         className="bg-gradient-to-br from-[#f0f5ee] to-[#e8f0e4] rounded-2xl p-5 border border-[#d5e5cf] shadow-sm animate-cascade"
         style={{ animationDelay: "0.25s" }}
       >
-        {/* Dato principal: Cuota mensual */}
-        <div className="text-center mb-4">
-          <div className="text-[11px] text-[#7a9e6d] uppercase tracking-wider font-semibold">Tu cuota mensual</div>
-          <div className="mt-1">
-            <span className="text-4xl font-extrabold text-[#7a9e6d]">{formatEur(Math.round(cuotaMensual))}</span>
-            <span className="text-lg font-bold text-[#7a9e6d]/70">/mes</span>
+        <div className="max-w-[500px] mx-auto">
+          {/* Dato principal: Cuota mensual */}
+          <div className="text-center mb-4">
+            <div className="text-[11px] text-[#7a9e6d] uppercase tracking-wider font-semibold">Tu cuota mensual</div>
+            <div className="mt-1">
+              <span className="text-4xl font-extrabold text-[#7a9e6d]">{formatEur(Math.round(cuotaMensual))}</span>
+              <span className="text-lg font-bold text-[#7a9e6d]/70">/mes</span>
+            </div>
           </div>
-        </div>
 
-        {/* Fila secundaria: 3 datos clave */}
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          <div className="bg-white/60 rounded-xl px-2 py-2.5 text-center">
-            <div className="text-[10px] text-[#8a7e6d] font-medium">Total a pagar</div>
-            <div className="text-sm font-bold text-[#3d3528]">{formatEur(costeTotal)}</div>
+          {/* Tabla tipo factura */}
+          <div className="bg-white/60 rounded-xl px-4 py-1 divide-y divide-[#e8e0d4]">
+            <div className="flex justify-between py-2.5 text-sm">
+              <span className="text-[#8a7e6d]">Precio del piso</span>
+              <span className="text-[#3d3528]">{formatEur(precio)}</span>
+            </div>
+            <div className="flex justify-between py-2.5 text-sm">
+              <span className="text-[#8a7e6d]">Gastos de compra</span>
+              <span className="text-[#3d3528]">{formatEur(totalGastos)}</span>
+            </div>
+            <div className="flex justify-between py-2.5 text-sm">
+              <span className="font-bold text-[#3d3528]">Total a pagar</span>
+              <span className="font-bold text-[#3d3528]">{formatEur(costeTotal)}</span>
+            </div>
+            <div className="flex justify-between py-2.5 text-sm">
+              <span className="text-[#8a7e6d]">Entrada necesaria</span>
+              <span className="text-[#3d3528]">{formatEur(entrada)}</span>
+            </div>
+            <div className="flex justify-between py-2.5 text-sm">
+              <span className="font-bold text-[#3d3528]">Hipoteca solicitada</span>
+              <span className="font-bold text-[#3d3528]">{formatEur(capitalHipoteca)}</span>
+            </div>
+            <div className="flex justify-between py-2.5 text-sm">
+              <span className="text-[#8a7e6d]">Salario mínimo necesario</span>
+              <span className="text-[#3d3528]">{formatEur(Math.round(salarioMinimo))}/mes</span>
+            </div>
+            <div className="flex justify-between py-2.5 text-sm">
+              <span className="text-[#8a7e6d]">Ratio de endeudamiento</span>
+              <span className="text-[#3d3528]">máx. 30%</span>
+            </div>
           </div>
-          <div className="bg-white/60 rounded-xl px-2 py-2.5 text-center">
-            <div className="text-[10px] text-[#8a7e6d] font-medium">Entrada necesaria</div>
-            <div className="text-sm font-bold text-[#3d3528]">{formatEur(entrada)}</div>
-          </div>
-          <div className="bg-white/60 rounded-xl px-2 py-2.5 text-center">
-            <div className="text-[10px] text-[#8a7e6d] font-medium">Hipoteca</div>
-            <div className="text-sm font-bold text-[#3d3528]">{formatEur(capitalHipoteca)}</div>
-          </div>
-        </div>
-
-        {/* Terciarios: datos de contexto */}
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-[#8a7e6d] px-1">
-          <div className="flex justify-between"><span>Precio del piso</span><span className="font-semibold">{formatEur(precio)}</span></div>
-          <div className="flex justify-between"><span>Gastos de compra</span><span className="font-semibold">{formatEur(totalGastos)}</span></div>
-          <div className="flex justify-between"><span>Salario mín. necesario</span><span className="font-semibold">{formatEur(Math.round(salarioMinimo))}/mes</span></div>
-          <div className="flex justify-between"><span>Ratio endeudamiento</span><span className="font-semibold">máx. 30%</span></div>
         </div>
       </div>
     </div>
