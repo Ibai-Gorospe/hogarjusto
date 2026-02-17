@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { TABS } from "@/app/lib/data";
+import { useAuth } from "@/app/lib/AuthContext";
 import MapaPrecios from "@/app/components/MapaPrecios";
 import PrecioJusto from "@/app/components/PrecioJusto";
 import CostesCompra from "@/app/components/CostesCompra";
@@ -12,6 +13,7 @@ import Guia from "@/app/components/Guia";
 
 export default function Dashboard() {
   const [tab, setTab] = useState(0);
+  const { user, signOut } = useAuth();
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#faf7f2] via-[#f5f0e8] to-[#faf7f2] text-[#3d3528] font-sans px-4 py-5">
@@ -25,6 +27,18 @@ export default function Dashboard() {
         <p className="text-[#8a7e6d] text-sm mt-1.5">
           Guía de compra de vivienda en Vitoria-Gasteiz
         </p>
+        {/* Info usuario y logout */}
+        {user && (
+          <div className="mt-2 flex items-center justify-center gap-2">
+            <span className="text-xs text-[#8a7e6d]">{user.email}</span>
+            <button
+              onClick={signOut}
+              className="text-xs text-[#c0735e] hover:underline"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Navegación por pestañas */}
