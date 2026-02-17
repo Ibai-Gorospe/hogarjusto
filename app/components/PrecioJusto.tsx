@@ -38,6 +38,9 @@ function pisoToDb(p: Piso, userId: string) {
     terraza: p.terraza,
     antiguedad: p.antiguedad,
     notas: p.notas || "",
+    direccion: p.direccion || "",
+    lat: p.lat || null,
+    lng: p.lng || null,
   };
 }
 
