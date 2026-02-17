@@ -41,6 +41,158 @@ export const BARRIOS: Barrio[] = [
   { name: "Armentia", precioM2: 2900, var: 5.0, tipo: "premium", lat: 42.832, lng: -2.695, desc: "Residencial exclusivo, entorno natural, Parque de Armentia", servicios: 5, transporte: 5, zonaVerde: 10, ambiente: "Exclusivo natural" },
 ];
 
+// ============================================================
+// Geocodificación y cálculo de precio por ubicación
+// ============================================================
+
+/**
+ * Distancia en metros entre dos puntos (fórmula de Haversine).
+ * Precisa para distancias cortas dentro de una ciudad.
+ */
+export function distanciaMetros(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000; // Radio de la Tierra en metros
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * Resultado de la interpolación de precio por ubicación.
+ */
+export interface PrecioUbicacion {
+  precioM2: number;          // Precio interpolado €/m²
+  barrioMasCercano: string;  // Nombre del barrio más cercano
+  distanciaBarrio: number;   // Distancia al barrio más cercano en metros
+  confianza: "alta" | "media" | "baja"; // Según distancia al centro urbano
+}
+
+/**
+ * Calcula el precio de referencia €/m² para unas coordenadas dadas,
+ * usando interpolación por distancia inversa ponderada (IDW).
+ *
+ * En vez de asignar el precio plano de un barrio, pondera los precios
+ * de los barrios cercanos según la distancia inversa al cuadrado.
+ * Esto crea una transición suave entre barrios y elimina los saltos
+ * bruscos en las fronteras.
+ *
+ * Parámetro `potencia`:
+ *   - 2 (default): transición suave, influencia amplia de barrios cercanos
+ *   - 3: transición más local, el barrio más cercano domina más
+ *
+ * Solo se consideran barrios dentro del radio máximo (3km por defecto).
+ */
+export function calcularPrecioReferencia(
+  lat: number,
+  lng: number,
+  potencia: number = 2,
+  radioMaxMetros: number = 3000
+): PrecioUbicacion {
+  // Calcular distancia a cada barrio
+  const distancias = BARRIOS.map(b => ({
+    barrio: b,
+    dist: distanciaMetros(lat, lng, b.lat, b.lng),
+  }));
+
+  // Ordenar por cercanía
+  distancias.sort((a, b) => a.dist - b.dist);
+
+  const masCercano = distancias[0];
+
+  // Si estamos prácticamente encima de un centro de barrio (<50m),
+  // usar directamente su precio
+  if (masCercano.dist < 50) {
+    return {
+      precioM2: masCercano.barrio.precioM2,
+      barrioMasCercano: masCercano.barrio.name,
+      distanciaBarrio: Math.round(masCercano.dist),
+      confianza: "alta",
+    };
+  }
+
+  // Filtrar solo barrios dentro del radio máximo
+  const cercanos = distancias.filter(d => d.dist <= radioMaxMetros);
+
+  // Si no hay barrios dentro del radio (ubicación fuera de Vitoria),
+  // usar el más cercano con confianza baja
+  if (cercanos.length === 0) {
+    return {
+      precioM2: masCercano.barrio.precioM2,
+      barrioMasCercano: masCercano.barrio.name,
+      distanciaBarrio: Math.round(masCercano.dist),
+      confianza: "baja",
+    };
+  }
+
+  // Interpolación por distancia inversa ponderada (IDW)
+  let sumaPesoPrecio = 0;
+  let sumaPesos = 0;
+
+  for (const { barrio, dist } of cercanos) {
+    const peso = 1 / dist ** potencia;
+    sumaPesoPrecio += peso * barrio.precioM2;
+    sumaPesos += peso;
+  }
+
+  const precioInterpolado = Math.round(sumaPesoPrecio / sumaPesos);
+
+  // Confianza según distancia al barrio más cercano
+  let confianza: "alta" | "media" | "baja";
+  if (masCercano.dist <= 500) confianza = "alta";
+  else if (masCercano.dist <= 1500) confianza = "media";
+  else confianza = "baja";
+
+  return {
+    precioM2: precioInterpolado,
+    barrioMasCercano: masCercano.barrio.name,
+    distanciaBarrio: Math.round(masCercano.dist),
+    confianza,
+  };
+}
+
+/**
+ * Geocodifica una dirección usando la API de Nominatim (OpenStreetMap).
+ * Gratuita, sin API key, límite de 1 petición/segundo.
+ * Devuelve null si no encuentra resultados.
+ */
+export async function geocodificarDireccion(
+  direccion: string
+): Promise<{ lat: number; lng: number; displayName: string } | null> {
+  // Añadir "Vitoria-Gasteiz" si no lo incluye para mejorar resultados
+  const query = direccion.toLowerCase().includes("vitoria")
+    ? direccion
+    : `${direccion}, Vitoria-Gasteiz, Álava`;
+
+  const url = `https://nominatim.openstreetmap.org/search?` +
+    `format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=es` +
+    `&viewbox=-2.75,-2.60,42.81,42.90&bounded=1`;
+
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "HogarJusto/1.0 (hogarjusto.es)" },
+    });
+    const data = await res.json();
+
+    if (data && data.length > 0) {
+      return {
+        lat: parseFloat(data[0].lat),
+        lng: parseFloat(data[0].lon),
+        displayName: data[0].display_name,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// ============================================================
+// Resto de utilidades (sin cambios)
+// ============================================================
+
 // Nombres de las pestañas
 export const TABS = ["Mapa de Precios", "¿Precio justo?", "Costes Compra", "Hipoteca", "Checklist", "Ayudas", "Guía"];
 
@@ -85,7 +237,10 @@ export const getLabel = (tipo: TipoBarrio): string => {
 export interface PisoForm {
   nombre: string;
   url: string;
-  barrio: string;
+  barrio: string;        // Se asigna automáticamente desde la dirección
+  direccion: string;     // NUEVO: dirección introducida por el usuario
+  lat: number | null;    // NUEVO: latitud geocodificada
+  lng: number | null;    // NUEVO: longitud geocodificada
   precio: number | string;
   m2: number | string;
   planta: number;
@@ -115,14 +270,38 @@ export interface Valoracion {
   diferencia: number;
   veredicto: string;
   vColor: string;
-  baseBarrio: number;
+  baseBarrio: number;       // Precio de referencia usado (interpolado o de barrio)
+  barrioNombre: string;     // NUEVO: nombre del barrio más cercano
+  confianza: "alta" | "media" | "baja"; // NUEVO: confianza de la estimación
 }
 
-// Modelo de valoración: estima precio justo basado en media del barrio + ajustes
+/**
+ * Modelo de valoración: estima precio justo.
+ *
+ * Si el piso tiene coordenadas (lat/lng), usa interpolación geográfica
+ * para calcular el precio base. Si no, usa el barrio seleccionado
+ * (retrocompatibilidad con pisos guardados sin coordenadas).
+ */
 export const valorarPiso = (p: Piso): Valoracion | null => {
-  const barrio = BARRIOS.find(b => b.name === p.barrio);
-  if (!barrio) return null;
-  let base = barrio.precioM2;
+  let basePrecioM2: number;
+  let barrioNombre: string;
+  let confianza: "alta" | "media" | "baja" = "alta";
+
+  if (p.lat && p.lng) {
+    // NUEVO: usar interpolación geográfica
+    const ref = calcularPrecioReferencia(p.lat, p.lng);
+    basePrecioM2 = ref.precioM2;
+    barrioNombre = ref.barrioMasCercano;
+    confianza = ref.confianza;
+  } else {
+    // Retrocompatibilidad: usar barrio seleccionado manualmente
+    const barrio = BARRIOS.find(b => b.name === p.barrio);
+    if (!barrio) return null;
+    basePrecioM2 = barrio.precioM2;
+    barrioNombre = barrio.name;
+  }
+
+  let base = basePrecioM2;
 
   // Ajuste por estado
   const estadoAdj: Record<string, number> = { "nuevo": 0.12, "reformado": 0.05, "bueno": 0, "a reformar": -0.20 };
@@ -171,5 +350,15 @@ export const valorarPiso = (p: Piso): Valoracion | null => {
   else if (diferencia < 12) { veredicto = "Algo caro — hay margen para negociar"; vColor = "#c0735e"; }
   else { veredicto = "Caro — negocia fuerte o descarta"; vColor = "#c0534f"; }
 
-  return { precioEstimado, precioM2Est: Math.round(base), precioM2Pedido: Math.round(precioM2Pedido), diferencia, veredicto, vColor, baseBarrio: barrio.precioM2 };
+  return {
+    precioEstimado,
+    precioM2Est: Math.round(base),
+    precioM2Pedido: Math.round(precioM2Pedido),
+    diferencia,
+    veredicto,
+    vColor,
+    baseBarrio: basePrecioM2,
+    barrioNombre,
+    confianza,
+  };
 };

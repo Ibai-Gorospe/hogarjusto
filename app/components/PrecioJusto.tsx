@@ -1,14 +1,18 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { BARRIOS, formatEur, valorarPiso, Piso, PisoForm } from "@/app/lib/data";
+import {
+  BARRIOS, formatEur, valorarPiso, geocodificarDireccion,
+  calcularPrecioReferencia, Piso, PisoForm
+} from "@/app/lib/data";
 import { useLocalStorage } from "@/app/lib/useLocalStorage";
 import { useAuth } from "@/app/lib/AuthContext";
 import { supabase } from "@/app/lib/supabase";
 
 // Formulario vacío por defecto
 const FORM_VACIO: PisoForm = {
-  nombre: "", url: "", barrio: "Ensanche", precio: "", m2: "",
+  nombre: "", url: "", barrio: "", direccion: "", lat: null, lng: null,
+  precio: "", m2: "",
   planta: 3, ascensor: true, estado: "bueno", energetica: "D",
   exterior: true, orientacionSur: false, garaje: false,
   trastero: false, terraza: false, antiguedad: "2000s", notas: ""
@@ -44,6 +48,9 @@ function dbToPiso(row: Record<string, unknown>): Piso {
     nombre: row.nombre as string,
     url: (row.url as string) || "",
     barrio: row.barrio as string,
+    direccion: (row.direccion as string) || "",
+    lat: (row.lat as number) || null,
+    lng: (row.lng as number) || null,
     precio: row.precio as number,
     m2: row.m2 as number,
     planta: (row.planta as number) || 3,
@@ -60,6 +67,9 @@ function dbToPiso(row: Record<string, unknown>): Piso {
   };
 }
 
+// Estado de la geocodificación
+type GeoEstado = "idle" | "buscando" | "encontrado" | "no_encontrado" | "error";
+
 export default function PrecioJusto() {
   const { user } = useAuth();
 
@@ -72,6 +82,13 @@ export default function PrecioJusto() {
 
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<PisoForm>(FORM_VACIO);
+
+  // Estado de geocodificación
+  const [geoEstado, setGeoEstado] = useState<GeoEstado>("idle");
+  const [geoInfo, setGeoInfo] = useState<string>("");
+
+  // Modo de entrada: dirección o barrio manual (fallback)
+  const [modoManual, setModoManual] = useState(false);
 
   // Decidir qué pisos mostrar según si hay usuario o no
   const pisos = user ? cloudPisos : localPisos;
@@ -95,9 +112,41 @@ export default function PrecioJusto() {
     loadCloudPisos();
   }, [loadCloudPisos]);
 
+  // Geocodificar la dirección introducida
+  const geocodificar = async () => {
+    if (!form.direccion.trim()) return;
+
+    setGeoEstado("buscando");
+    setGeoInfo("");
+
+    const resultado = await geocodificarDireccion(form.direccion);
+
+    if (resultado) {
+      const ref = calcularPrecioReferencia(resultado.lat, resultado.lng);
+      setForm({
+        ...form,
+        lat: resultado.lat,
+        lng: resultado.lng,
+        barrio: ref.barrioMasCercano,
+      });
+      setGeoEstado("encontrado");
+      setGeoInfo(
+        `${ref.barrioMasCercano} · ${formatEur(ref.precioM2)}/m² · ` +
+        `${ref.distanciaBarrio < 1000
+          ? ref.distanciaBarrio + "m del centro del barrio"
+          : (ref.distanciaBarrio / 1000).toFixed(1) + "km del centro del barrio"}`
+      );
+    } else {
+      setGeoEstado("no_encontrado");
+      setGeoInfo("No se encontró la dirección. Prueba a ser más específico o usa el modo manual.");
+    }
+  };
+
   // Añadir un piso nuevo
   const addPiso = async () => {
     if (!form.nombre || !form.precio || !form.m2) return;
+    if (!form.barrio && !form.lat) return;
+    if (modoManual && !form.barrio) return;
 
     const nuevoPiso: Piso = {
       ...form,
@@ -108,21 +157,19 @@ export default function PrecioJusto() {
     };
 
     if (user) {
-      // Guardar en Supabase
       const { error } = await supabase
         .from("valuations")
         .insert(pisoToDb(nuevoPiso, user.id));
-
-      if (!error) {
-        await loadCloudPisos(); // Recargar desde la nube
-      }
+      if (!error) await loadCloudPisos();
     } else {
-      // Guardar en localStorage
       setLocalPisos([...localPisos, nuevoPiso]);
     }
 
     setForm(FORM_VACIO);
     setShowForm(false);
+    setGeoEstado("idle");
+    setGeoInfo("");
+    setModoManual(false);
   };
 
   // Eliminar un piso
@@ -146,9 +193,9 @@ export default function PrecioJusto() {
       <div className="bg-[#f0f5ee] rounded-2xl p-4 mb-4 border border-[#d5e5cf]">
         <div className="text-sm font-bold text-[#5a7a5a] mb-1">📐 Metodología</div>
         <p className="text-xs text-[#5a5040] leading-relaxed">
-          Parto del precio medio real del barrio (datos enero 2026) y ajusto según las características del piso:
-          estado, planta, ascensor, orientación, antigüedad, extras... El resultado es una estimación del{" "}
-          <strong className="text-[#3d3528]">precio justo</strong> para ese piso concreto.
+          Introduce la dirección del piso y calculamos el precio de referencia de la zona interpolando
+          datos de los barrios cercanos (datos enero 2026). Después ajustamos según las características
+          del piso: estado, planta, ascensor, orientación, antigüedad, extras...
           No es una tasación oficial, pero ayuda a saber si es buena oportunidad o si conviene negociar.
         </p>
       </div>
@@ -188,15 +235,83 @@ export default function PrecioJusto() {
                 value={form.url} onChange={e => setForm({ ...form, url: e.target.value })} />
             </div>
 
-            {/* Barrio, precio, m² */}
-            <div className="grid grid-cols-3 gap-3">
+            {/* ====== UBICACIÓN ====== */}
+            {!modoManual ? (
+              <div>
+                <label className={labelClass}>Dirección del piso *</label>
+                <div className="flex gap-2">
+                  <input
+                    className={`${inputClass} flex-1`}
+                    placeholder="Ej: Calle Florida 15, 3º"
+                    value={form.direccion}
+                    onChange={e => {
+                      setForm({ ...form, direccion: e.target.value, lat: null, lng: null, barrio: "" });
+                      setGeoEstado("idle");
+                      setGeoInfo("");
+                    }}
+                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); geocodificar(); } }}
+                  />
+                  <button
+                    onClick={geocodificar}
+                    disabled={geoEstado === "buscando" || !form.direccion.trim()}
+                    className="px-4 bg-[#7a9e6d] text-white rounded-lg text-sm font-semibold hover:bg-[#6b8e5e] transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    {geoEstado === "buscando" ? "Buscando..." : "📍 Localizar"}
+                  </button>
+                </div>
+
+                {/* Resultado de geocodificación */}
+                {geoEstado === "encontrado" && geoInfo && (
+                  <div className="mt-2 bg-[#f0f5ee] rounded-lg px-3 py-2 text-xs text-[#5a7a5a] flex items-center gap-2">
+                    <span className="text-base">✅</span>
+                    <span>{geoInfo}</span>
+                  </div>
+                )}
+                {geoEstado === "no_encontrado" && (
+                  <div className="mt-2 bg-[#fdf2f0] rounded-lg px-3 py-2 text-xs text-[#c0534f]">
+                    ⚠️ {geoInfo}
+                  </div>
+                )}
+                {geoEstado === "error" && (
+                  <div className="mt-2 bg-[#fdf2f0] rounded-lg px-3 py-2 text-xs text-[#c0534f]">
+                    ❌ Error de conexión. Prueba de nuevo o usa el modo manual.
+                  </div>
+                )}
+
+                {/* Link a modo manual */}
+                <button
+                  onClick={() => {
+                    setModoManual(true);
+                    setForm({ ...form, lat: null, lng: null, barrio: "Ensanche" });
+                    setGeoEstado("idle");
+                    setGeoInfo("");
+                  }}
+                  className="mt-1.5 text-[11px] text-[#8a7e6d] hover:text-[#5a5040] underline"
+                >
+                  ¿No encuentras la dirección? Seleccionar barrio manualmente
+                </button>
+              </div>
+            ) : (
               <div>
                 <label className={labelClass}>Barrio *</label>
                 <select className={inputClass} value={form.barrio}
                   onChange={e => setForm({ ...form, barrio: e.target.value })}>
-                  {BARRIOS.map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
+                  {BARRIOS.map(b => <option key={b.name} value={b.name}>{b.name} ({formatEur(b.precioM2)}/m²)</option>)}
                 </select>
+                <button
+                  onClick={() => {
+                    setModoManual(false);
+                    setForm({ ...form, barrio: "", lat: null, lng: null });
+                  }}
+                  className="mt-1.5 text-[11px] text-[#7a9e6d] hover:text-[#5a8a5a] underline"
+                >
+                  ← Volver a búsqueda por dirección
+                </button>
               </div>
+            )}
+
+            {/* Precio, m² */}
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelClass}>Precio (€) *</label>
                 <input className={inputClass} type="number" placeholder="200000"
@@ -281,10 +396,11 @@ export default function PrecioJusto() {
           {/* Botones */}
           <div className="flex gap-3 mt-5">
             <button onClick={addPiso}
-              className="flex-1 bg-[#7a9e6d] text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-[#6b8e5e] transition-colors">
+              disabled={!form.nombre || !form.precio || !form.m2 || (!form.barrio && !form.lat)}
+              className="flex-1 bg-[#7a9e6d] text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-[#6b8e5e] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
               Valorar piso
             </button>
-            <button onClick={() => { setShowForm(false); setForm(FORM_VACIO); }}
+            <button onClick={() => { setShowForm(false); setForm(FORM_VACIO); setGeoEstado("idle"); setGeoInfo(""); setModoManual(false); }}
               className="px-5 bg-[#f5f0e8] text-[#8a7e6d] rounded-xl py-2.5 text-sm font-semibold hover:bg-[#e8e0d4] transition-colors">
               Cancelar
             </button>
@@ -319,7 +435,9 @@ export default function PrecioJusto() {
               <div className="flex justify-between items-start mb-3">
                 <div>
                   <div className="font-bold text-[#3d3528]">{p.nombre}</div>
-                  <div className="text-xs text-[#8a7e6d]">{p.barrio} · {p.m2}m² · Planta {p.planta}</div>
+                  <div className="text-xs text-[#8a7e6d]">
+                    {p.direccion ? `📍 ${p.direccion}` : v.barrioNombre} · {p.m2}m² · Planta {p.planta}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {p.url && (
@@ -346,6 +464,18 @@ export default function PrecioJusto() {
                 </div>
               </div>
 
+              {/* Indicador de confianza */}
+              {v.confianza !== "alta" && (
+                <div className={`text-[10px] text-center mb-2 ${
+                  v.confianza === "media" ? "text-[#c0935a]" : "text-[#c0534f]"
+                }`}>
+                  {v.confianza === "media"
+                    ? "⚠️ Estimación aproximada — la dirección está entre barrios"
+                    : "⚠️ Estimación con baja confianza — ubicación fuera del área cubierta"
+                  }
+                </div>
+              )}
+
               {/* Comparativa 3 columnas */}
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="bg-[#f5f0e8] rounded-xl p-3">
@@ -359,7 +489,7 @@ export default function PrecioJusto() {
                   <div className="text-[10px] text-[#7a9e6d]">{formatEur(v.precioM2Est)}/m²</div>
                 </div>
                 <div className="bg-[#f5f0e8] rounded-xl p-3">
-                  <div className="text-[10px] text-[#8a7e6d] uppercase tracking-wide">Media barrio</div>
+                  <div className="text-[10px] text-[#8a7e6d] uppercase tracking-wide">Ref. zona</div>
                   <div className="text-base font-bold text-[#8a7e6d]">{formatEur(v.baseBarrio * p.m2)}</div>
                   <div className="text-[10px] text-[#8a7e6d]">{formatEur(v.baseBarrio)}/m²</div>
                 </div>
@@ -389,6 +519,7 @@ export default function PrecioJusto() {
               {/* Badges de características */}
               <div className="flex flex-wrap gap-1.5 mt-3">
                 {[
+                  v.barrioNombre && `📍 ${v.barrioNombre}`,
                   p.ascensor && "Ascensor",
                   p.exterior ? "Exterior" : "Interior",
                   p.orientacionSur && "Sur",
