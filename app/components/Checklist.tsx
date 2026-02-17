@@ -1,6 +1,9 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import { useLocalStorage } from "@/app/lib/useLocalStorage";
+import { useAuth } from "@/app/lib/AuthContext";
+import { supabase } from "@/app/lib/supabase";
 
 // Datos del checklist con todas las fases
 const SECTIONS = [
@@ -54,14 +57,63 @@ const SECTIONS = [
   ]},
 ];
 
-// Contar total de items
 const TOTAL_ITEMS = SECTIONS.reduce((sum, s) => sum + s.items.length, 0);
 
 export default function Checklist() {
-  const [checks, setChecks] = useLocalStorage<Record<string, boolean>>("checks", {});
+  const { user } = useAuth();
 
-  const toggleCheck = (id: string) => {
-    setChecks({ ...checks, [id]: !checks[id] });
+  // localStorage para usuarios no logueados
+  const [localChecks, setLocalChecks] = useLocalStorage<Record<string, boolean>>("checks", {});
+
+  // Supabase para usuarios logueados
+  const [cloudChecks, setCloudChecks] = useState<Record<string, boolean>>({});
+  const [loadingCloud, setLoadingCloud] = useState(false);
+
+  // Decidir qué checks usar
+  const checks = user ? cloudChecks : localChecks;
+
+  // Cargar checks desde Supabase
+  const loadCloudChecks = useCallback(async () => {
+    if (!user) return;
+    setLoadingCloud(true);
+    const { data, error } = await supabase
+      .from("checklist_progress")
+      .select("check_id");
+
+    if (!error && data) {
+      const map: Record<string, boolean> = {};
+      data.forEach(row => { map[row.check_id] = true; });
+      setCloudChecks(map);
+    }
+    setLoadingCloud(false);
+  }, [user]);
+
+  useEffect(() => {
+    loadCloudChecks();
+  }, [loadCloudChecks]);
+
+  // Toggle check
+  const toggleCheck = async (checkId: string) => {
+    if (user) {
+      if (cloudChecks[checkId]) {
+        // Desmarcar: borrar de Supabase
+        await supabase.from("checklist_progress")
+          .delete()
+          .eq("check_id", checkId);
+      } else {
+        // Marcar: insertar en Supabase
+        await supabase.from("checklist_progress")
+          .insert({ user_id: user.id, check_id: checkId });
+      }
+      // Actualizar estado local inmediatamente (sin esperar recarga)
+      setCloudChecks(prev => {
+        const next = { ...prev };
+        if (next[checkId]) { delete next[checkId]; } else { next[checkId] = true; }
+        return next;
+      });
+    } else {
+      setLocalChecks({ ...localChecks, [checkId]: !localChecks[checkId] });
+    }
   };
 
   const totalChecked = Object.values(checks).filter(Boolean).length;
@@ -72,6 +124,18 @@ export default function Checklist() {
       <p className="text-sm text-[#8a7e6d] mb-4">
         Marca cada paso conforme lo vayas completando. Te servirá de guía para no dejarte nada.
       </p>
+
+      {/* Indicador de almacenamiento */}
+      {user && (
+        <div className="text-center text-[10px] text-[#7a9e6d] mb-3">
+          ☁️ Tu progreso se guarda en la nube
+        </div>
+      )}
+
+      {/* Loading */}
+      {user && loadingCloud && (
+        <div className="text-center text-sm text-[#8a7e6d] py-4">Cargando progreso...</div>
+      )}
 
       {/* Secciones */}
       {SECTIONS.map((section, si) => {
@@ -109,7 +173,6 @@ export default function Checklist() {
                 onClick={() => toggleCheck(item.id)}
                 className="flex items-start gap-2.5 py-1.5 cursor-pointer border-b border-[#e8e0d4] last:border-b-0 text-sm"
               >
-                {/* Checkbox custom */}
                 <div className={`w-5 h-5 min-w-[20px] rounded-md mt-0.5 flex items-center justify-center transition-all ${
                   checks[item.id]
                     ? "bg-gradient-to-br from-[#6a8a5a] to-[#8aaa6d]"
