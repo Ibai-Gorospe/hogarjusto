@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { BARRIOS, formatEur, valorarPiso, Piso, PisoForm } from "@/app/lib/data";
 import { useLocalStorage } from "@/app/lib/useLocalStorage";
+import { useAuth } from "@/app/lib/AuthContext";
+import { supabase } from "@/app/lib/supabase";
 
 // Formulario vacío por defecto
 const FORM_VACIO: PisoForm = {
@@ -12,28 +14,125 @@ const FORM_VACIO: PisoForm = {
   trastero: false, terraza: false, antiguedad: "2000s", notas: ""
 };
 
+// Mapear campo de la app a campo de la BD (camelCase → snake_case)
+function pisoToDb(p: Piso, userId: string) {
+  return {
+    user_id: userId,
+    nombre: p.nombre,
+    url: p.url || "",
+    barrio: p.barrio,
+    precio: p.precio,
+    m2: p.m2,
+    planta: p.planta,
+    ascensor: p.ascensor,
+    estado: p.estado,
+    energetica: p.energetica,
+    exterior: p.exterior,
+    orientacion_sur: p.orientacionSur,
+    garaje: p.garaje,
+    trastero: p.trastero,
+    terraza: p.terraza,
+    antiguedad: p.antiguedad,
+    notas: p.notas || "",
+  };
+}
+
+// Mapear campo de la BD a campo de la app (snake_case → camelCase)
+function dbToPiso(row: Record<string, unknown>): Piso {
+  return {
+    id: row.id as number,
+    nombre: row.nombre as string,
+    url: (row.url as string) || "",
+    barrio: row.barrio as string,
+    precio: row.precio as number,
+    m2: row.m2 as number,
+    planta: (row.planta as number) || 3,
+    ascensor: row.ascensor as boolean,
+    estado: (row.estado as string) || "bueno",
+    energetica: (row.energetica as string) || "D",
+    exterior: row.exterior as boolean,
+    orientacionSur: row.orientacion_sur as boolean,
+    garaje: row.garaje as boolean,
+    trastero: row.trastero as boolean,
+    terraza: row.terraza as boolean,
+    antiguedad: (row.antiguedad as string) || "2000s",
+    notas: (row.notas as string) || "",
+  };
+}
+
 export default function PrecioJusto() {
-  const [pisos, setPisos] = useLocalStorage<Piso[]>("pisos", []);
+  const { user } = useAuth();
+
+  // localStorage para usuarios no logueados
+  const [localPisos, setLocalPisos] = useLocalStorage<Piso[]>("pisos", []);
+
+  // Supabase para usuarios logueados
+  const [cloudPisos, setCloudPisos] = useState<Piso[]>([]);
+  const [loadingCloud, setLoadingCloud] = useState(false);
+
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<PisoForm>(FORM_VACIO);
 
+  // Decidir qué pisos mostrar según si hay usuario o no
+  const pisos = user ? cloudPisos : localPisos;
+
+  // Cargar pisos desde Supabase cuando hay usuario
+  const loadCloudPisos = useCallback(async () => {
+    if (!user) return;
+    setLoadingCloud(true);
+    const { data, error } = await supabase
+      .from("valuations")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      setCloudPisos(data.map(dbToPiso));
+    }
+    setLoadingCloud(false);
+  }, [user]);
+
+  useEffect(() => {
+    loadCloudPisos();
+  }, [loadCloudPisos]);
+
   // Añadir un piso nuevo
-  const addPiso = () => {
+  const addPiso = async () => {
     if (!form.nombre || !form.precio || !form.m2) return;
-    setPisos([...pisos, {
+
+    const nuevoPiso: Piso = {
       ...form,
       id: Date.now(),
       precio: +form.precio,
       m2: +form.m2,
       planta: +form.planta || 0,
-    }]);
+    };
+
+    if (user) {
+      // Guardar en Supabase
+      const { error } = await supabase
+        .from("valuations")
+        .insert(pisoToDb(nuevoPiso, user.id));
+
+      if (!error) {
+        await loadCloudPisos(); // Recargar desde la nube
+      }
+    } else {
+      // Guardar en localStorage
+      setLocalPisos([...localPisos, nuevoPiso]);
+    }
+
     setForm(FORM_VACIO);
     setShowForm(false);
   };
 
   // Eliminar un piso
-  const deletePiso = (id: number) => {
-    setPisos(pisos.filter(p => p.id !== id));
+  const deletePiso = async (id: number) => {
+    if (user) {
+      await supabase.from("valuations").delete().eq("id", id);
+      await loadCloudPisos();
+    } else {
+      setLocalPisos(localPisos.filter(p => p.id !== id));
+    }
   };
 
   // Estilos reutilizables
@@ -53,6 +152,13 @@ export default function PrecioJusto() {
           No es una tasación oficial, pero ayuda a saber si es buena oportunidad o si conviene negociar.
         </p>
       </div>
+
+      {/* Indicador de almacenamiento */}
+      {user && (
+        <div className="text-center text-[10px] text-[#7a9e6d] mb-3">
+          ☁️ Tus valoraciones se guardan en la nube
+        </div>
+      )}
 
       {/* Botón añadir */}
       {!showForm && (
@@ -186,8 +292,13 @@ export default function PrecioJusto() {
         </div>
       )}
 
-      {/* Lista de pisos valorados */}
-      {pisos.length === 0 && !showForm && (
+      {/* Estado de carga */}
+      {user && loadingCloud && (
+        <div className="text-center text-sm text-[#8a7e6d] py-8">Cargando valoraciones...</div>
+      )}
+
+      {/* Lista vacía */}
+      {pisos.length === 0 && !showForm && !loadingCloud && (
         <div className="bg-white rounded-2xl p-8 border border-[#e8e0d4] text-center">
           <div className="text-3xl mb-3">🏠</div>
           <p className="text-sm text-[#8a7e6d]">
@@ -196,6 +307,7 @@ export default function PrecioJusto() {
         </div>
       )}
 
+      {/* Lista de pisos valorados */}
       <div className="space-y-4">
         {pisos.map(p => {
           const v = valorarPiso(p);
