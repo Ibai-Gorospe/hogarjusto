@@ -1,19 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { BARRIOS, TipoBarrio, formatEur, formatPct, getColor, getLabel } from "@/app/lib/data";
-
-// Componente de estrellas para puntuaciones
-function StarRating({ value, max = 10 }: { value: number; max?: number }) {
-  const stars = Math.round((value / max) * 5);
-  return (
-    <span className="tracking-wide">
-      {[...Array(5)].map((_, i) => (
-        <span key={i} className={`text-xs ${i < stars ? "text-[#d4a55a]" : "text-[#ddd5c8]"}`}>★</span>
-      ))}
-    </span>
-  );
-}
+import { BARRIOS, AÑOS_HISTORICO, formatEur, formatPct, getColor, getLabel } from "@/app/lib/data";
 
 export default function MapaPrecios() {
   const [selectedBarrio, setSelectedBarrio] = useState<string | null>(null);
@@ -30,21 +18,21 @@ export default function MapaPrecios() {
     return b;
   }, [filterTipo, sortBy]);
 
-  const selected = BARRIOS.find(b => b.name === selectedBarrio);
-
   // Stats generales
   const precioMin = Math.min(...BARRIOS.map(b => b.precioM2));
   const precioMax = Math.max(...BARRIOS.map(b => b.precioM2));
   const precioMedio = Math.round(BARRIOS.reduce((s, b) => s + b.precioM2, 0) / BARRIOS.length);
+  const zonaCara = BARRIOS.reduce((a, b) => a.precioM2 > b.precioM2 ? a : b);
+  const zonaBarata = BARRIOS.reduce((a, b) => a.precioM2 < b.precioM2 ? a : b);
 
   return (
     <div>
       {/* Stats resumen */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
-          { label: "Media ciudad", value: "~3.100€/m²", sub: "+7-8% anual" },
-          { label: "Más caro", value: formatEur(precioMax) + "/m²", sub: "Ensanche" },
-          { label: "Más barato", value: formatEur(precioMin) + "/m²", sub: "Abetxuko" },
+          { label: "Media ciudad", value: formatEur(precioMedio) + "/m²", sub: `${BARRIOS.length} zonas` },
+          { label: "Más cara", value: formatEur(precioMax) + "/m²", sub: zonaCara.name },
+          { label: "Más barata", value: formatEur(precioMin) + "/m²", sub: zonaBarata.name },
         ].map((s, i) => (
           <div key={i} className="bg-white rounded-xl p-3 border border-[#e8e0d4] text-center">
             <div className="text-[10px] text-[#8a7e6d] uppercase tracking-wider font-semibold">{s.label}</div>
@@ -91,7 +79,6 @@ export default function MapaPrecios() {
             <div className="flex justify-between items-start mb-2">
               <div>
                 <div className="font-bold text-[#3d3528]">{b.name}</div>
-                <div className="text-xs text-[#8a7e6d]">{b.desc}</div>
               </div>
               <div className="text-right">
                 <div className="text-lg font-bold" style={{ color: getColor(b.precioM2) }}>
@@ -123,26 +110,33 @@ export default function MapaPrecios() {
               </span>
             </div>
 
-            {/* Detalle expandido */}
+            {/* Detalle expandido: serie histórica */}
             {selectedBarrio === b.name && (
               <div className="mt-3 pt-3 border-t border-[#e8e0d4]">
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <div className="text-[10px] text-[#8a7e6d] mb-1">Servicios</div>
-                    <StarRating value={b.servicios} />
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-[#8a7e6d] mb-1">Transporte</div>
-                    <StarRating value={b.transporte} />
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-[#8a7e6d] mb-1">Zonas verdes</div>
-                    <StarRating value={b.zonaVerde} />
-                  </div>
-                </div>
-                <div className="mt-3 text-center">
-                  <span className="text-xs text-[#8a7e6d]">Ambiente: </span>
-                  <span className="text-xs font-semibold text-[#3d3528]">{b.ambiente}</span>
+                <div className="text-[10px] text-[#8a7e6d] uppercase tracking-wider font-semibold mb-2">Evolución €/m² (2015–2026)</div>
+                <div className="flex items-end gap-[3px] h-16">
+                  {b.historico.map((p, i) => {
+                    if (p === 0) return <div key={i} className="flex-1" />;
+                    const maxH = Math.max(...b.historico.filter(v => v > 0));
+                    const minH = Math.min(...b.historico.filter(v => v > 0));
+                    const pct = maxH === minH ? 100 : ((p - minH) / (maxH - minH)) * 80 + 20;
+                    const isLast = i === b.historico.length - 1;
+                    return (
+                      <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                        <div
+                          className="w-full rounded-sm transition-all"
+                          style={{
+                            height: `${pct}%`,
+                            background: isLast ? getColor(b.precioM2) : "#d4cfc6",
+                          }}
+                          title={`${AÑOS_HISTORICO[i]}: ${formatEur(p)}/m²`}
+                        />
+                        {(i === 0 || i === 6 || isLast) && (
+                          <div className="text-[8px] text-[#8a7e6d]">{String(AÑOS_HISTORICO[i]).slice(2)}</div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
                 <div className="mt-2 text-center text-xs text-[#8a7e6d]">
                   Piso medio de 80m²: <span className="font-bold text-[#3d3528]">{formatEur(b.precioM2 * 80)}</span>

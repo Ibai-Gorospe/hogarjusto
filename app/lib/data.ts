@@ -1,44 +1,80 @@
 // Datos de mercado de Vitoria-Gasteiz — enero 2026
 // Fuentes: General Inmobiliaria, Perales Digital, tasadorexperto.es, Observatorio Vasco de Vivienda
+// 56 zonas con serie histórica 2015-2026
 
 export type TipoBarrio = "premium" | "medio-alto" | "medio" | "asequible" | "económico";
 
+/** Años correspondientes a cada posición del array historico */
+export const AÑOS_HISTORICO = [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026] as const;
+
 export interface Barrio {
-  name: string;
-  precioM2: number;
-  var: number; // variación interanual %
-  tipo: TipoBarrio;
+  id: number;           // ID de zona (portales inmobiliarios)
+  name: string;         // Nombre de la zona
+  precioM2: number;     // Precio actual €/m² (enero 2026)
+  var: number;          // Variación interanual 2025→2026 (%)
+  tipo: TipoBarrio;     // Clasificación por rango de precio
   lat: number;
   lng: number;
-  desc: string;
-  servicios: number; // 1-10
-  transporte: number;
-  zonaVerde: number;
-  ambiente: string;
+  historico: number[];  // Serie de precios €/m² [2015..2026] (12 valores, 0 = sin datos)
 }
 
 export const BARRIOS: Barrio[] = [
-  { name: "Ensanche", precioM2: 3500, var: 8.0, tipo: "premium", lat: 42.847, lng: -2.673, desc: "Centro comercial y financiero, edificios históricos renovados", servicios: 10, transporte: 10, zonaVerde: 6, ambiente: "Urbano céntrico" },
-  { name: "Lovaina", precioM2: 3300, var: 7.0, tipo: "premium", lat: 42.851, lng: -2.675, desc: "Zona noble junto a la Catedral Nueva, pisos amplios", servicios: 9, transporte: 9, zonaVerde: 5, ambiente: "Residencial señorial" },
-  { name: "Mendizorrotza", precioM2: 2850, var: 5.0, tipo: "premium", lat: 42.838, lng: -2.688, desc: "Zona del estadio del Alavés, amplias zonas deportivas", servicios: 7, transporte: 7, zonaVerde: 9, ambiente: "Deportivo/residencial" },
-  { name: "San Martín", precioM2: 2800, var: 5.0, tipo: "medio-alto", lat: 42.852, lng: -2.680, desc: "Barrio céntrico consolidado, ambiente familiar", servicios: 9, transporte: 9, zonaVerde: 6, ambiente: "Familiar céntrico" },
-  { name: "Desamparados", precioM2: 2900, var: 7.0, tipo: "medio-alto", lat: 42.849, lng: -2.668, desc: "Muy bien ubicado, cerca del Ensanche", servicios: 8, transporte: 9, zonaVerde: 5, ambiente: "Urbano residencial" },
-  { name: "Salburua", precioM2: 3200, var: 12.0, tipo: "premium", lat: 42.846, lng: -2.645, desc: "Barrio nuevo, humedales protegidos, familias jóvenes", servicios: 8, transporte: 7, zonaVerde: 10, ambiente: "Moderno familiar" },
-  { name: "Judimendi", precioM2: 2650, var: 8.0, tipo: "medio", lat: 42.843, lng: -2.665, desc: "Rica historia, mezcla de tradición y modernidad", servicios: 8, transporte: 8, zonaVerde: 6, ambiente: "Tradicional vibrante" },
-  { name: "Ariznabarra", precioM2: 2550, var: 7.0, tipo: "medio", lat: 42.840, lng: -2.685, desc: "Zona mixta, parte antigua más económica", servicios: 7, transporte: 7, zonaVerde: 7, ambiente: "Mixto residencial" },
-  { name: "Txagorritxu", precioM2: 2700, var: 10.0, tipo: "medio", lat: 42.854, lng: -2.685, desc: "Cerca del hospital, subida fuerte de precios", servicios: 8, transporte: 8, zonaVerde: 5, ambiente: "Urbano práctico" },
-  { name: "Lakua-Arriaga", precioM2: 3000, var: 10.0, tipo: "medio-alto", lat: 42.862, lng: -2.678, desc: "Residencial tranquilo, bien comunicado", servicios: 7, transporte: 8, zonaVerde: 7, ambiente: "Residencial moderno" },
-  { name: "Zabalgana", precioM2: 3100, var: 8.0, tipo: "medio-alto", lat: 42.855, lng: -2.710, desc: "Desarrollo reciente, planificación moderna", servicios: 7, transporte: 6, zonaVerde: 8, ambiente: "Moderno en expansión" },
-  { name: "Adurtza", precioM2: 2350, var: 7.0, tipo: "asequible", lat: 42.838, lng: -2.665, desc: "Clase trabajadora, nuevas promociones en Esmaltaciones", servicios: 6, transporte: 7, zonaVerde: 6, ambiente: "Obrero en renovación" },
-  { name: "Casco Viejo", precioM2: 1950, var: 5.0, tipo: "asequible", lat: 42.849, lng: -2.672, desc: "Centro histórico medieval, mucho encanto, pisos pequeños", servicios: 8, transporte: 9, zonaVerde: 4, ambiente: "Histórico con carácter" },
-  { name: "Coronación", precioM2: 2200, var: 8.0, tipo: "asequible", lat: 42.857, lng: -2.670, desc: "Muchas transacciones, barrio activo", servicios: 7, transporte: 7, zonaVerde: 5, ambiente: "Popular dinámico" },
-  { name: "Santa Lucía", precioM2: 2300, var: 8.0, tipo: "asequible", lat: 42.845, lng: -2.660, desc: "Zona en revalorización", servicios: 6, transporte: 7, zonaVerde: 5, ambiente: "En transformación" },
-  { name: "Sansomendi", precioM2: 1950, var: 8.0, tipo: "económico", lat: 42.866, lng: -2.672, desc: "Demanda creciente, zonas verdes amplias", servicios: 6, transporte: 6, zonaVerde: 7, ambiente: "Popular accesible" },
-  { name: "El Pilar", precioM2: 2750, var: 12.0, tipo: "medio", lat: 42.852, lng: -2.672, desc: "Edificios años 60-70, cerca del centro, fuerte subida", servicios: 7, transporte: 8, zonaVerde: 5, ambiente: "Práctico céntrico" },
-  { name: "Zaramaga", precioM2: 2300, var: 10.0, tipo: "asequible", lat: 42.860, lng: -2.665, desc: "Origen obrero, junto CC Boulevard, en auge", servicios: 7, transporte: 7, zonaVerde: 4, ambiente: "Popular comercial" },
-  { name: "Aranbizkarra", precioM2: 2250, var: 8.0, tipo: "asequible", lat: 42.863, lng: -2.660, desc: "De los más económicos, subida notable", servicios: 5, transporte: 6, zonaVerde: 5, ambiente: "Económico funcional" },
-  { name: "Abetxuko", precioM2: 1900, var: 10.0, tipo: "económico", lat: 42.870, lng: -2.680, desc: "El más asequible urbano, buena opción primeros compradores", servicios: 5, transporte: 5, zonaVerde: 6, ambiente: "Económico periférico" },
-  { name: "Armentia", precioM2: 2900, var: 5.0, tipo: "premium", lat: 42.832, lng: -2.695, desc: "Residencial exclusivo, entorno natural, Parque de Armentia", servicios: 5, transporte: 5, zonaVerde: 10, ambiente: "Exclusivo natural" },
+  { id: 33, name: "Abetxuko", precioM2: 2216, var: 22.0, tipo: "asequible", lat: 42.87511, lng: -2.68041, historico: [928, 1048, 1131, 1191, 1310, 1441, 1484, 1652, 1652, 1652, 1817, 2216] },
+  { id: 49, name: "Ali Nuevo", precioM2: 2870, var: 20.0, tipo: "medio", lat: 42.85854, lng: -2.70976, historico: [1551, 1776, 1932, 2045, 2126, 2338, 2338, 2338, 2279, 2279, 2392, 2870] },
+  { id: 30, name: "Ali Viejo", precioM2: 1995, var: 20.0, tipo: "económico", lat: 42.86363, lng: -2.71637, historico: [1009, 1021, 1092, 1187, 1246, 1308, 1308, 1438, 1509, 1584, 1663, 1995] },
+  { id: 19, name: "Arana", precioM2: 2708, var: 18.0, tipo: "asequible", lat: 42.84899, lng: -2.65912, historico: [1305, 1368, 1464, 1591, 1877, 1844, 1807, 1987, 1987, 2087, 2295, 2708] },
+  { id: 8, name: "Aranbizkarra", precioM2: 2780, var: 24.0, tipo: "asequible", lat: 42.85508, lng: -2.66167, historico: [1464, 1652, 1783, 1877, 2027, 2027, 1986, 2085, 2147, 2039, 2242, 2780] },
+  { id: 39, name: "Arantzabal-Castilla Sur", precioM2: 5572, var: 10.0, tipo: "premium", lat: 42.84456, lng: -2.68157, historico: [3910, 4246, 4486, 4630, 5093, 5347, 5347, 5347, 4919, 4919, 5066, 5572] },
+  { id: 18, name: "Aranzabela", precioM2: 3148, var: 21.0, tipo: "medio", lat: 42.85294, lng: -2.65625, historico: [1489, 1681, 1814, 1910, 2139, 2151, 2151, 2366, 2366, 2366, 2602, 3148] },
+  { id: 25, name: "Ariznabarra", precioM2: 3570, var: 21.4, tipo: "medio-alto", lat: 42.84186, lng: -2.68993, historico: [1760, 1986, 2144, 2257, 2437, 2485, 2485, 2658, 2724, 2724, 2941, 3570] },
+  { id: 24, name: "Armentia", precioM2: 4606, var: 15.0, tipo: "premium", lat: 42.83519, lng: -2.69852, historico: [3062, 3248, 3381, 3461, 3564, 3742, 3742, 3816, 3816, 3816, 4006, 4606] },
+  { id: 52, name: "Armentia-Caserón", precioM2: 4158, var: 13.0, tipo: "medio-alto", lat: 42.83192, lng: -2.70268, historico: [2858, 3052, 3191, 3274, 3437, 3505, 3505, 3505, 3505, 3505, 3680, 4158] },
+  { id: 34, name: "Asteguieta", precioM2: 1657, var: 25.0, tipo: "económico", lat: 42.86093, lng: -2.73057, historico: [972, 1019, 1090, 1185, 1185, 1185, 1149, 1263, 1263, 1263, 1326, 1657] },
+  { id: 15, name: "Avenida Gasteiz", precioM2: 4024, var: 10.0, tipo: "medio-alto", lat: 42.8496, lng: -2.68137, historico: [2136, 2312, 2438, 2513, 2764, 3178, 3336, 3669, 3669, 3485, 3659, 4024] },
+  { id: 50, name: "Betoño Chalets", precioM2: 2850, var: 12.0, tipo: "medio", lat: 42.86313, lng: -2.66401, historico: [1733, 1955, 2110, 2222, 2355, 2355, 2355, 2355, 2355, 2355, 2545, 2850] },
+  { id: 60, name: "Betoño Pisos", precioM2: 1722, var: 19.1, tipo: "económico", lat: 42.87103, lng: -2.67191, historico: [825, 931, 1005, 1058, 1216, 1216, 1216, 1313, 1313, 1378, 1446, 1722] },
+  { id: 1, name: "Casco Viejo", precioM2: 2196, var: 13.1, tipo: "económico", lat: 42.849, lng: -2.672, historico: [1427, 1574, 1684, 1830, 1920, 1824, 1735, 1908, 1850, 1850, 1942, 2196] },
+  { id: 4, name: "Centro", precioM2: 3799, var: 15.0, tipo: "medio-alto", lat: 42.84552, lng: -2.67129, historico: [2249, 2434, 2567, 2646, 2910, 2979, 3068, 3313, 3147, 3147, 3304, 3799] },
+  { id: 13, name: "Ciudad Jardín", precioM2: 4750, var: 13.0, tipo: "premium", lat: 42.83796, lng: -2.6768, historico: [3040, 3100, 3260, 3400, 3502, 3780, 3780, 3855, 3855, 3855, 4204, 4750] },
+  { id: 6, name: "Coronación", precioM2: 2498, var: 15.0, tipo: "asequible", lat: 42.85209, lng: -2.67708, historico: [1353, 1419, 1518, 1650, 1730, 1765, 1765, 1976, 1976, 1976, 2173, 2498] },
+  { id: 11, name: "Desamparadas-Plaza de Toros", precioM2: 4204, var: 14.0, tipo: "medio-alto", lat: 42.84133, lng: -2.66526, historico: [2204, 2369, 2487, 2558, 2941, 2999, 3058, 3363, 3447, 3447, 3688, 4204] },
+  { id: 16, name: "El Pilar", precioM2: 2778, var: 16.0, tipo: "asequible", lat: 42.85822, lng: -2.67684, historico: [1280, 1445, 1559, 1642, 1888, 1941, 1999, 2198, 2252, 2139, 2395, 2778] },
+  { id: 46, name: "Frente Hotel Lakua-Aramangelu", precioM2: 3390, var: 12.0, tipo: "medio", lat: 42.86849, lng: -2.68579, historico: [1661, 1875, 2023, 2130, 2343, 2575, 2497, 2746, 2746, 2883, 3027, 3390] },
+  { id: 28, name: "Gazalbide-San Viator", precioM2: 3100, var: 16.0, tipo: "medio", lat: 42.85559, lng: -2.68257, historico: [1812, 2032, 2185, 2295, 2478, 2476, 2426, 2546, 2546, 2546, 2673, 3100] },
+  { id: 61, name: "Goikolarra-Aretxabaleta", precioM2: 4255, var: 15.0, tipo: "medio-alto", lat: 42.82695, lng: -2.6738, historico: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3700, 4255] },
+  { id: 41, name: "Ibaiondo", precioM2: 3046, var: 15.0, tipo: "medio", lat: 42.86926, lng: -2.69401, historico: [1660, 1873, 2022, 2129, 2341, 2341, 2294, 2523, 2523, 2523, 2649, 3046] },
+  { id: 22, name: "Iturritxu-Zumaquera", precioM2: 3036, var: 17.0, tipo: "medio", lat: 42.83551, lng: -2.66687, historico: [1450, 1636, 1766, 1859, 2007, 2007, 2007, 2207, 2317, 2317, 2595, 3036] },
+  { id: 10, name: "Judimendi", precioM2: 3300, var: 18.0, tipo: "medio", lat: 42.84532, lng: -2.66152, historico: [1500, 1694, 1828, 1925, 2213, 2434, 2434, 2677, 2677, 2543, 2797, 3300] },
+  { id: 38, name: "Lakua-Baiona-Estella", precioM2: 3228, var: 18.0, tipo: "medio", lat: 42.86412, lng: -2.69425, historico: [1601, 1806, 1950, 2053, 2196, 2240, 2195, 2370, 2370, 2488, 2736, 3228] },
+  { id: 36, name: "Lakua-Ertzaintza", precioM2: 3496, var: 15.0, tipo: "medio", lat: 42.86389, lng: -2.68603, historico: [1816, 2050, 2212, 2329, 2515, 2640, 2560, 2764, 2764, 2764, 3040, 3496] },
+  { id: 37, name: "Lakua-Estación Autobuses", precioM2: 3923, var: 14.0, tipo: "medio-alto", lat: 42.85912, lng: -2.68535, historico: [1841, 2016, 2208, 2346, 2627, 2889, 2975, 3123, 3123, 3279, 3442, 3923] },
+  { id: 29, name: "Lakua-Juntas Generales", precioM2: 2964, var: 20.0, tipo: "medio", lat: 42.86508, lng: -2.68023, historico: [1446, 1633, 1762, 1855, 2003, 2103, 2060, 2163, 2206, 2206, 2470, 2964] },
+  { id: 45, name: "Lakua-Landaberde-Xabier", precioM2: 3065, var: 22.0, tipo: "medio", lat: 42.86502, lng: -2.69809, historico: [1912, 1985, 2037, 2194, 2303, 2303, 2233, 2456, 2394, 2394, 2513, 3065] },
+  { id: 44, name: "Lakua-Plaza Cataluña", precioM2: 3489, var: 20.0, tipo: "medio", lat: 42.8673, lng: -2.69064, historico: [1688, 1906, 2057, 2165, 2489, 2538, 2461, 2707, 2639, 2770, 2908, 3489] },
+  { id: 32, name: "Lakua-Telefónica", precioM2: 3294, var: 20.0, tipo: "medio", lat: 42.85653, lng: -2.6934, historico: [1433, 1618, 1746, 1839, 2022, 2224, 2224, 2335, 2335, 2451, 2745, 3294] },
+  { id: 3, name: "Los Herrán-Arana", precioM2: 2998, var: 15.0, tipo: "medio", lat: 42.84614, lng: -2.6654, historico: [1879, 2121, 2289, 2410, 2530, 2530, 2530, 2656, 2576, 2370, 2607, 2998] },
+  { id: 5, name: "Lovaina-Catedral Nueva", precioM2: 4461, var: 10.0, tipo: "medio-alto", lat: 42.84605, lng: -2.67837, historico: [2509, 2691, 2821, 2899, 3333, 3666, 3739, 3963, 3863, 3863, 4056, 4461] },
+  { id: 14, name: "Mendizabala-Parque Prado", precioM2: 4579, var: 13.0, tipo: "premium", lat: 42.83689, lng: -2.68212, historico: [3100, 3250, 3250, 3500, 3605, 3785, 3785, 3860, 3860, 3860, 4053, 4579] },
+  { id: 2, name: "Parque del Norte", precioM2: 2733, var: 14.0, tipo: "asequible", lat: 42.85461, lng: -2.67121, historico: [1716, 1936, 2090, 2200, 2350, 2232, 2187, 2405, 2405, 2284, 2398, 2733] },
+  { id: 58, name: "Salburua Carta de Atenas-Aalbor", precioM2: 4054, var: 14.9, tipo: "medio-alto", lat: 42.85095, lng: -2.64679, historico: [2024, 2310, 2509, 2652, 2917, 2917, 2917, 3208, 3208, 3208, 3528, 4054] },
+  { id: 59, name: "Salburua Juan Carlos I", precioM2: 3754, var: 12.0, tipo: "medio-alto", lat: 42.85579, lng: -2.65599, historico: [1865, 2130, 2315, 2448, 2815, 2815, 2758, 2978, 2903, 3048, 3352, 3754] },
+  { id: 56, name: "Salburua S10-13 Izarra", precioM2: 3026, var: 20.0, tipo: "medio", lat: 42.84051, lng: -2.65251, historico: [1457, 1670, 1818, 1925, 2117, 2222, 2222, 2333, 2402, 2402, 2522, 3026] },
+  { id: 57, name: "Salburua S9-Parque del Este", precioM2: 4458, var: 13.0, tipo: "medio-alto", lat: 42.84537, lng: -2.65182, historico: [1906, 2176, 2365, 2500, 2875, 3162, 3256, 3418, 3418, 3588, 3946, 4458] },
+  { id: 55, name: "Salburua-Ibaialde-Arkaiate", precioM2: 3157, var: 15.0, tipo: "medio", lat: 42.84717, lng: -2.64378, historico: [1672, 1912, 2080, 2200, 2420, 2420, 2347, 2628, 2693, 2693, 2746, 3157] },
+  { id: 12, name: "San Cristóbal-Fournier", precioM2: 3135, var: 11.0, tipo: "medio", lat: 42.83961, lng: -2.66811, historico: [1561, 1762, 1901, 2002, 2142, 2250, 2317, 2432, 2492, 2616, 2825, 3135] },
+  { id: 26, name: "San Martín-Abendaño", precioM2: 4314, var: 10.0, tipo: "medio-alto", lat: 42.85164, lng: -2.68679, historico: [2070, 2323, 2499, 2626, 2888, 3027, 3178, 3559, 3736, 3736, 3922, 4314] },
+  { id: 31, name: "Sansomendi", precioM2: 2642, var: 20.0, tipo: "asequible", lat: 42.85634, lng: -2.69843, historico: [1305, 1368, 1464, 1591, 1718, 1803, 1766, 1907, 1907, 2002, 2202, 2642] },
+  { id: 20, name: "Santa Lucía-Astrónomos", precioM2: 3167, var: 19.0, tipo: "medio", lat: 42.8435, lng: -2.65672, historico: [1414, 1595, 1722, 1713, 2084, 2167, 2167, 2427, 2548, 2420, 2662, 3167] },
+  { id: 9, name: "Santiago", precioM2: 2909, var: 11.7, tipo: "medio", lat: 42.84844, lng: -2.66339, historico: [1682, 1898, 2049, 2157, 2351, 2398, 2350, 2538, 2664, 2530, 2605, 2909] },
+  { id: 23, name: "Sector Sur-Río Batán", precioM2: 4782, var: 18.0, tipo: "premium", lat: 42.84105, lng: -2.68195, historico: [2975, 3080, 3395, 3500, 3605, 3785, 3785, 3860, 3860, 3860, 4053, 4782] },
+  { id: 40, name: "Seminario", precioM2: 3645, var: 13.0, tipo: "medio-alto", lat: 42.85104, lng: -2.69006, historico: [2168, 2446, 2641, 2780, 2919, 2919, 2831, 3057, 3133, 3133, 3226, 3645] },
+  { id: 27, name: "Txagorritxu-B.T. Zumárraga", precioM2: 3647, var: 10.0, tipo: "medio-alto", lat: 42.853, lng: -2.684, historico: [1642, 1841, 1979, 2078, 2223, 2445, 2518, 2820, 2820, 2961, 3316, 3647] },
+  { id: 51, name: "Zabalgana-Borinbizkarra", precioM2: 3532, var: 15.0, tipo: "medio-alto", lat: 42.852, lng: -2.7, historico: [1772, 2012, 2180, 2300, 2530, 2530, 2530, 2656, 2841, 2983, 3072, 3532] },
+  { id: 48, name: "Zabalgana-S2 Senda Río Ali", precioM2: 4116, var: 10.0, tipo: "medio-alto", lat: 42.84282, lng: -2.69609, historico: [1828, 2088, 2270, 2400, 2760, 2760, 2842, 3126, 3204, 3402, 3742, 4116] },
+  { id: 47, name: "Zabalgana-S3 Leclerc", precioM2: 4077, var: 12.0, tipo: "medio-alto", lat: 42.83883, lng: -2.69932, historico: [2041, 2329, 2530, 2674, 2941, 2999, 3058, 3303, 3303, 3468, 3641, 4077] },
+  { id: 54, name: "Zabalgana-S6 Mariturri", precioM2: 3214, var: 12.0, tipo: "medio", lat: 42.83995, lng: -2.70738, historico: [1524, 1746, 1900, 2011, 2312, 2543, 2543, 2746, 2814, 2814, 2870, 3214] },
+  { id: 17, name: "Zaramaga-Centro Comercial Bulevar", precioM2: 2625, var: 20.0, tipo: "asequible", lat: 42.8615, lng: -2.66805, historico: [1133, 1189, 1271, 1382, 1616, 1777, 1777, 1954, 1954, 1954, 2188, 2625] },
+  { id: 7, name: "Zaramaga-Iparralde", precioM2: 2498, var: 14.0, tipo: "asequible", lat: 42.85504, lng: -2.66756, historico: [1406, 1475, 1578, 1715, 1800, 1836, 1780, 1993, 1993, 1993, 2192, 2498] },
 ];
 
 // ============================================================
@@ -212,13 +248,14 @@ export const formatEur = (n: number): string =>
 export const formatPct = (n: number): string =>
   (n >= 0 ? "+" : "") + n.toFixed(1) + "%";
 
-// Color por precio €/m²
+// Color por precio €/m² (adaptado al rango 1.600–5.600 de las 56 zonas)
 export const getColor = (precio: number): string => {
-  if (precio >= 3000) return "#c0735e";
-  if (precio >= 2600) return "#d4956a";
-  if (precio >= 2200) return "#c4a55a";
-  if (precio >= 1900) return "#7a9e6d";
-  return "#5a8a5a";
+  if (precio >= 4500) return "#c0534f"; // premium alto
+  if (precio >= 3500) return "#c0735e"; // medio-alto
+  if (precio >= 3000) return "#d4956a"; // medio
+  if (precio >= 2500) return "#c4a55a"; // asequible
+  if (precio >= 2000) return "#7a9e6d"; // económico
+  return "#5a8a5a";                     // muy económico
 };
 
 // Etiqueta legible del tipo de barrio
